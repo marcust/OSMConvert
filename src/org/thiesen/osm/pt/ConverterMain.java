@@ -1,14 +1,24 @@
 /*
  * $ Id $
- * (c) Copyright 2009 freiheit.com technologies gmbh
+ * (c) Copyright 2009 Marcus Thiesen (marcus@thiesen.org)
  *
- * This file contains unpublished, proprietary trade secret information of
- * freiheit.com technologies gmbh. Use, transcription, duplication and
- * modification are strictly prohibited without prior written consent of
- * freiheit.com technologies gmbh.
+ *  This file is part of HHPT.
  *
- * Initial version by Marcus Thiesen (marcus.thiesen@freiheit.com)
+ *  HHPT is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  HHPT is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with HHPT.  If not, see <http://www.gnu.org/licenses/>.
+ *
  */
+
 package org.thiesen.osm.pt;
 
 import java.io.BufferedInputStream;
@@ -25,13 +35,7 @@ import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.index.CorruptIndexException;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.tools.bzip2.CBZip2InputStream;
-import org.thiesen.hhpt.shared.model.station.Station;
 import org.thiesen.hhpt.shared.model.station.StationType;
 import org.thiesen.hhpt.shared.model.station.Stations;
 import org.thiesen.hhpt.shared.model.tag.StationTypeTagKey;
@@ -45,7 +49,7 @@ public class ConverterMain {
 
     private final static String OSM_SOURCE = "http://download.geofabrik.de/osm/europe/germany/hamburg.osm.bz2";
 
-    public static void main( final String... args ) throws IOException {
+    public static void main( final String... args ) throws IOException  {
         final InputStream osmStream = getOSMInputStream(); 
 
 
@@ -70,72 +74,12 @@ public class ConverterMain {
         writer.write( stations.asFileString() );
         writer.close();
 
-        outputLucene( stations );
-        
         System.out.println("DONE");
 
     }
 
 
-    private static void outputLucene( final Stations stations ) throws CorruptIndexException, LockObtainFailedException, IOException {
-        final IndexWriter writer = new IndexWriter("index", new StandardAnalyzer(), true);
-
-        writer.setUseCompoundFile( true );
-        final long start = System.currentTimeMillis();
-        for ( final Station s : stations ) {
-            addPoint( writer, s );
-        }
-
-        writer.optimize( true );
-        writer.close();
-
-        System.out.println("Indexing took " + ( System.currentTimeMillis() - start ) + " ms");
-    }
-
-    /* Cited from Solr NumberUtil, Apache License */
-    public static int long2sortableStr(long val, final char[] out, int offset) {
-        val += Long.MIN_VALUE;
-        out[offset++] = (char)(val >>>60);
-        out[offset++] = (char)(val >>>45 & 0x7fff);
-        out[offset++] = (char)(val >>>30 & 0x7fff);
-        out[offset++] = (char)(val >>>15 & 0x7fff);
-        out[offset] = (char)(val & 0x7fff);
-        return 5;
-    }
-
-
-    public static String long2sortableStr(final long val) {
-        final char[] arr = new char[5];
-        long2sortableStr(val,arr,0);
-        return new String(arr,0,5);
-    }
-
-    public static String double2sortableStr(final double val) {
-        long f = Double.doubleToRawLongBits(val);
-        if (f<0) f ^= 0x7fffffffffffffffL;
-        return long2sortableStr(f);
-    }
-    /* End Citation */
-
-    private static void addPoint(final IndexWriter writer, final Station s ) throws IOException{
-
-        final org.apache.lucene.document.Document doc = new org.apache.lucene.document.Document();
-
-        doc.add(new Field("name", s.getName(),Field.Store.YES, Field.Index.UN_TOKENIZED));
-        doc.add(new Field("type", s.getType().toString(),Field.Store.YES, Field.Index.UN_TOKENIZED ));
-
-
-        // convert the lat / long to lucene fields
-        doc.add(new Field("lat", double2sortableStr(s.getPosition().getLatitude().doubleValue()),Field.Store.YES, Field.Index.UN_TOKENIZED));
-        doc.add(new Field("lng", double2sortableStr(s.getPosition().getLongitude().doubleValue()),Field.Store.YES, Field.Index.UN_TOKENIZED));
-
-        // add a default meta field to make searching all documents easy
-        doc.add(new Field("metafile", "doc",Field.Store.YES, Field.Index.TOKENIZED));
-        writer.addDocument(doc);
-
-    }
-
-
+ 
     private static InputStream getOSMInputStream() throws ClientProtocolException, IOException {
         final HttpClient client = new DefaultHttpClient();
 
@@ -250,5 +194,7 @@ public class ConverterMain {
 
     }
 
+    
+    
 
 }
