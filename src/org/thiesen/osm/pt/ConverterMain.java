@@ -44,34 +44,25 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 public class ConverterMain {
 
-    private final static String OSM_SOURCE = "http://download.geofabrik.de/osm/europe/germany/hamburg.osm.bz2";
+    private final static String OSM_SOURCE_HH = "http://download.geofabrik.de/osm/europe/germany/hamburg.osm.bz2";
+    private final static String OSM_SOURCE_ND = "http://download.geofabrik.de/osm/europe/germany/niedersachsen.osm.bz2";
+    
+    
+    public static void main( final String... args ) throws IOException, XmlPullParserException  {
+        final Stations stationsHH = downloadHamburg();
 
-    public static void main( final String... args ) throws IOException  {
-        final InputStream osmStream = getOSMInputStream(); 
+        final Stations stationsNd = downloadNiedersachsen();
 
-
-        final Document doc = parseXmlFile( osmStream );
-
-        final Element root = getRoot( doc );
-
-        final Stations stations = new Stations();
-
-        final NodeList list = root.getChildNodes();
-        for (int i=0; i<list.getLength(); i++) {
-            final Node node = list.item( i );
-            if (node instanceof Element) {
-                addStationIfValid( (Element)node, stations );        
-            }
-        }
-
-        System.out.println("Found " + stations.size() + " stations");
-
-
+        
+        
         final FileWriter writer = new FileWriter( "stations.csv" );
-        writer.write( stations.asFileString() );
+        writer.write( Stations.union( stationsHH, stationsNd ).asFileString() );
         writer.close();
 
         System.out.println("DONE");
@@ -79,11 +70,46 @@ public class ConverterMain {
     }
 
 
+
+    private static Stations downloadHamburg() throws ClientProtocolException, IOException, XmlPullParserException {
+        final InputStream osmStream = getOSMInputStream( OSM_SOURCE_HH ); 
+
+        final Stations stations = extractStations( osmStream );
+
+        System.out.println("Found " + stations.size() + " stations in Hamburg");
+        return stations;
+    }
+
+    private static Stations downloadNiedersachsen() throws ClientProtocolException, IOException, XmlPullParserException {
+        final InputStream osmStream = getOSMInputStream( OSM_SOURCE_ND ); 
+
+        final Stations stations = extractStations( osmStream );
+
+        System.out.println("Found " + stations.size() + " stations in Niedersachsen");
+        return stations;
+    }
+    
+    
+
+
+    private static Stations extractStations( final InputStream osmStream ) throws XmlPullParserException, IOException {
+        final XmlPullParserFactory factory = XmlPullParserFactory.newInstance(
+                System.getProperty(XmlPullParserFactory.PROPERTY_NAME), null);
+        factory.setNamespaceAware(true);
+        final XmlPullParser xpp = factory.newPullParser();
+        xpp.setInput( osmStream, "utf8" );
+
+        final OSMPullParser opp = new OSMPullParser( xpp );
+        
+        return  opp.processDocument();
+    }
+
+
  
-    private static InputStream getOSMInputStream() throws ClientProtocolException, IOException {
+    private static InputStream getOSMInputStream( final String source ) throws ClientProtocolException, IOException {
         final HttpClient client = new DefaultHttpClient();
 
-        final HttpGet get = new HttpGet( OSM_SOURCE );
+        final HttpGet get = new HttpGet( source );
 
         final HttpResponse response = client.execute( get );
 
@@ -135,7 +161,7 @@ public class ConverterMain {
             }
 
             if ( type != null ) {
-                System.out.println("Added " + type + " with name " + name );
+                //System.out.println("Added " + type + " with name " + name );
                 stations.add( id, latitude, longitude, type, name, operator );
             }
 
