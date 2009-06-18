@@ -26,6 +26,7 @@ import java.io.IOException;
 import org.thiesen.hhpt.shared.model.station.StationType;
 import org.thiesen.hhpt.shared.model.station.Stations;
 import org.thiesen.hhpt.shared.model.tag.StationTypeTagKey;
+import org.thiesen.hhpt.shared.utils.GeoHashUtils;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -76,7 +77,7 @@ public class OSMPullParser {
                 if ( eventType == XmlPullParser.END_TAG && xpp.getName().equals( "node" ) ) {
 
                     if ( type != null ) {
-                         stations.add( id, latitude, longitude, type, name, operator );
+                         stations.add( id, latitude, longitude, GeoHashUtils.encode( latitude, longitude ),  type, name, operator );
                         return;
                     }
 
