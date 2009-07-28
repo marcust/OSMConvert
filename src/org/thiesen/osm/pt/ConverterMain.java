@@ -26,18 +26,12 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.tools.bzip2.CBZip2InputStream;
-import org.boehn.kmlframework.kml.Document;
-import org.boehn.kmlframework.kml.Kml;
-import org.boehn.kmlframework.kml.KmlException;
-import org.boehn.kmlframework.kml.Placemark;
-import org.thiesen.hhpt.shared.model.station.Station;
 import org.thiesen.hhpt.shared.model.station.Stations;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -49,65 +43,14 @@ public class ConverterMain {
     private final static String OSM_SOURCE_ND = "http://download.geofabrik.de/osm/europe/germany/niedersachsen.osm.bz2";
     
     
-    public static void main( final String... args ) throws IOException, XmlPullParserException, KmlException, HttpException  {
-        final Stations stationsHH = downloadHamburg();
+    public static void main( final String... args ) throws IOException, XmlPullParserException {
+        downloadHamburg();
+        downloadNiedersachsen();
 
-        final Stations stationsNd = downloadNiedersachsen();
-
-        
-        final Stations allStations = Stations.union( stationsHH, stationsNd );
-
-        
-//      final FileWriter writer = new FileWriter( "stations.csv" );
-//        
-//        writer.write( allStations.asFileString() );
-//        writer.close();
-
-        SolrPoster.sendAll( allStations );
-        
-        //writeKML( allStations );
-        
         System.out.println("DONE");
 
     }
-
-
-
-    private static void writeKML( final Stations stations ) throws KmlException, IOException {
-
-        // We create a new KML Document
-        final Kml kml = new Kml();
-
-        // We add a document to the kml
-        final Document document = new Document();
-        kml.setFeature(document);
-
-        
-        for ( final Station s : stations ) {
-            final Placemark pms = new Placemark( escape( s.getName() ) );
-            pms.setDescription( escape( s.getType() +  " " + s.getOperator().stringValue() ).trim() );
-            pms.setLocation( s.getPosition().getLongitude().doubleValue(), s.getPosition().getLatitude().doubleValue() );
-            
-            document.addFeature( pms );
-        }
-        
-
-
-        // We generate the kml file
-        kml.createKml("stations.kml");
-
-        
-    }
-
-
-
-    private static String escape( final String name ) {
-        return name.replaceAll( "&", "&amp;" ).replaceAll("<", "&lt;").replaceAll( ">", "&gt;" );
-        
-    }
-
-
-
+    
     private static Stations downloadHamburg() throws ClientProtocolException, IOException, XmlPullParserException {
         final InputStream osmStream = getOSMInputStream( OSM_SOURCE_HH ); 
 
@@ -126,19 +69,26 @@ public class ConverterMain {
         return stations;
     }
     
-    
-
 
     private static Stations extractStations( final InputStream osmStream ) throws XmlPullParserException, IOException {
         final XmlPullParserFactory factory = XmlPullParserFactory.newInstance(
                 System.getProperty(XmlPullParserFactory.PROPERTY_NAME), null);
         factory.setNamespaceAware(true);
         final XmlPullParser xpp = factory.newPullParser();
-        xpp.setInput( osmStream, "utf8" );
+        xpp.setInput( osmStream, "utf-8" );
 
         final OSMPullParser opp = new OSMPullParser( xpp );
         
-        return  opp.processDocument();
+        final CollectionStationListener listener = new CollectionStationListener();
+        
+        opp.registerStationListener( new SolrPoster() );
+        opp.registerStationListener( new KMLListener() );
+        opp.registerStationListener( new CSVFileStationListener() );
+        opp.registerStationListener( listener );
+       
+        opp.processDocument();
+        
+        return listener.getStations();
     }
 
 

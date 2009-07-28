@@ -22,32 +22,47 @@
 package org.thiesen.osm.pt;
 
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
+import org.thiesen.hhpt.shared.model.station.Station;
 import org.thiesen.hhpt.shared.model.station.StationType;
-import org.thiesen.hhpt.shared.model.station.Stations;
 import org.thiesen.hhpt.shared.model.tag.StationTypeTagKey;
-import org.thiesen.hhpt.shared.utils.GeoHashUtils;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class OSMPullParser {
+    
     private final XmlPullParser _xpp;
+    private final List<StationListener> _listener = new LinkedList<StationListener>();
+    
     public OSMPullParser( final XmlPullParser xpp ) {
         _xpp = xpp;
     }
+    
+    public void registerStationListener( final StationListener listener ) {
+        _listener.add( listener );
+    }
 
-    public Stations processDocument() throws XmlPullParserException, IOException
+    public void processDocument() throws XmlPullParserException, IOException
     {
-        final Stations retval = new Stations();
         int eventType = _xpp.getEventType();
         do {
             if (eventType == XmlPullParser.START_TAG) {
-                processStartElement( retval, _xpp);
+                processStartElement(  _xpp);
             }
             eventType = _xpp.next();
         } while (eventType != XmlPullParser.END_DOCUMENT);
 
-        return retval;
+
+        fireFinishedListener();
+    }
+
+    private void fireFinishedListener() {
+        for ( final StationListener listener : _listener ) {
+            listener.onStationCreationFinished();
+        }
+        
     }
 
     public void processEndElement (final XmlPullParser xpp)
@@ -61,7 +76,7 @@ public class OSMPullParser {
     }
 
 
-    public void processStartElement(final Stations stations, final XmlPullParser xpp) throws XmlPullParserException, IOException
+    public void processStartElement(  final XmlPullParser xpp) throws XmlPullParserException, IOException
     {
         final String tagName = xpp.getName();
 
@@ -77,7 +92,8 @@ public class OSMPullParser {
                 if ( eventType == XmlPullParser.END_TAG && xpp.getName().equals( "node" ) ) {
 
                     if ( type != null ) {
-                         stations.add( id, latitude, longitude, GeoHashUtils.encode( latitude, longitude ),  type, name, operator );
+                        fireListeners( Station.createStation( id, latitude, longitude,  type, name, operator ) );
+                        
                         return;
                     }
 
@@ -104,6 +120,13 @@ public class OSMPullParser {
             } while ( eventType != XmlPullParser.END_DOCUMENT );
         }
 
+    }
+
+    private void fireListeners( final Station createStation ) {
+       for ( final StationListener listener : _listener ) {
+           listener.onNewStationCreated( createStation );
+       }
+        
     }
 
     private static boolean isStationType( final XMLTag t ) {

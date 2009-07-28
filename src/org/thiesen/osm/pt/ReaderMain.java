@@ -37,7 +37,7 @@ public class ReaderMain {
         
         long count = 0;
         final long startTime = System.currentTimeMillis();
-        for ( final Station station : reader ) {
+        for ( @SuppressWarnings("unused") final Station station : reader ) {
             count++;
         }
         
