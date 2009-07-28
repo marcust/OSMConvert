@@ -47,12 +47,16 @@ public class SolrPoster {
             docs.add( makeDoc( station ) );
             
             if ( docs.size() >= 100 ) {
+                System.out.println("Posting docs");
                 post( docs );
                 docs.clear();
             }
             
-            
         }
+        
+        post( docs );
+        docs.clear();
+
     }
     
     
@@ -80,13 +84,15 @@ public class SolrPoster {
 
     private static void postToSolr( final String content ) throws IOException, HttpException {
         final HttpClient client = new DefaultHttpClient();
-        final HttpPost method = new HttpPost("http://androit.dyndns.org:8080/localsolr/update");
+        final HttpPost method = new HttpPost("http://hhpt-search.appspot.com/update");
 
         method.setHeader( "Content-Type", "application/xml; charset=utf8" ); 
         
         method.setEntity( new StringEntity( "<?xml version=\"1.0\" encoding=\"utf-8\"?>"  + content ) );
         
         client.execute( method );
+        
+        System.out.println("Executed update" );
     }
 
     private static Element makeDoc( final Station station ) {

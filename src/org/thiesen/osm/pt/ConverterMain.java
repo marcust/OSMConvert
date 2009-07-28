@@ -22,17 +22,22 @@
 package org.thiesen.osm.pt;
 
 import java.io.BufferedInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.tools.bzip2.CBZip2InputStream;
+import org.boehn.kmlframework.kml.Document;
+import org.boehn.kmlframework.kml.Kml;
+import org.boehn.kmlframework.kml.KmlException;
+import org.boehn.kmlframework.kml.Placemark;
+import org.thiesen.hhpt.shared.model.station.Station;
 import org.thiesen.hhpt.shared.model.station.Stations;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -44,17 +49,61 @@ public class ConverterMain {
     private final static String OSM_SOURCE_ND = "http://download.geofabrik.de/osm/europe/germany/niedersachsen.osm.bz2";
     
     
-    public static void main( final String... args ) throws IOException, XmlPullParserException  {
+    public static void main( final String... args ) throws IOException, XmlPullParserException, KmlException, HttpException  {
         final Stations stationsHH = downloadHamburg();
 
         final Stations stationsNd = downloadNiedersachsen();
 
-        final FileWriter writer = new FileWriter( "stations.csv" );
-        writer.write( Stations.union( stationsHH, stationsNd ).asFileString() );
-        writer.close();
+        
+        final Stations allStations = Stations.union( stationsHH, stationsNd );
 
+        
+//      final FileWriter writer = new FileWriter( "stations.csv" );
+//        
+//        writer.write( allStations.asFileString() );
+//        writer.close();
+
+        SolrPoster.sendAll( allStations );
+        
+        //writeKML( allStations );
+        
         System.out.println("DONE");
 
+    }
+
+
+
+    private static void writeKML( final Stations stations ) throws KmlException, IOException {
+
+        // We create a new KML Document
+        final Kml kml = new Kml();
+
+        // We add a document to the kml
+        final Document document = new Document();
+        kml.setFeature(document);
+
+        
+        for ( final Station s : stations ) {
+            final Placemark pms = new Placemark( escape( s.getName() ) );
+            pms.setDescription( escape( s.getType() +  " " + s.getOperator().stringValue() ).trim() );
+            pms.setLocation( s.getPosition().getLongitude().doubleValue(), s.getPosition().getLatitude().doubleValue() );
+            
+            document.addFeature( pms );
+        }
+        
+
+
+        // We generate the kml file
+        kml.createKml("stations.kml");
+
+        
+    }
+
+
+
+    private static String escape( final String name ) {
+        return name.replaceAll( "&", "&amp;" ).replaceAll("<", "&lt;").replaceAll( ">", "&gt;" );
+        
     }
 
 
